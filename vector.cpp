@@ -60,13 +60,7 @@ public:
         delete[] arr;
     }
     // Copy constructor
-    Vector(const Vector<T>& other) {
-        this->_size = other._size;
-        if (this->_capacity != other._capacity) {
-            this->_capacity = other._capacity;
-            delete[] arr;
-            this->arr = new T[_capacity];
-        }
+    Vector(const Vector<T>& other) : _size(other._size), _capacity(other._capacity), arr(new T[_capacity]){
         // Make a deep copy of the array
         for (int i = 0; i < _size; i++) {
             arr[i] = other.arr[i];
@@ -96,9 +90,9 @@ public:
         this->_capacity = other._capacity;
         this->arr = other.arr;
         // Ensure other is in a valid state
-        other.size = 0;
-        other.capacity = MIN_CAPACITY;
-        other.arr = new T[MIN_CAPACITY];
+        other._size = 0;
+        other._capacity = 0;
+        other.arr = nullptr;
     }
     // Move assignment operator
     Vector<T>& operator=(Vector<T>&& other) {
@@ -107,9 +101,9 @@ public:
             this->_capacity = other._capacity;
             this->arr = other.arr;
             // Ensure other is in a valid state
-            other.size = 0;
-            other.capacity = MIN_CAPACITY;
-            other.arr = new T[MIN_CAPACITY];
+            other._size = 0;
+            other._capacity = 0;
+            other.arr = nullptr;
         }
         return *this;
     }
@@ -157,6 +151,7 @@ public:
             }
             delete[] arr;
             arr = new_arr;
+            _capacity = new_size;
         }
     }
     void push_back(const T& value) {
