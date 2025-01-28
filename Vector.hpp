@@ -78,7 +78,7 @@ public:
     }
     // Copy assignment operator, returns lvalue reference
     // Copy and swap idiom: other is copied by value
-    Vector<T>& operator=(Vector<T>& other) {
+    Vector<T>& operator=(const Vector<T>& other) {
         Vector<T> temp(other);
         swap(*this, temp);
         return *this;
@@ -106,7 +106,7 @@ public:
         return arr[index];
     }
     // Implement operator<< overload as free friend function
-    friend std::ostream& operator<<(std::ostream& os, Vector& v) const {
+    friend std::ostream& operator<<(std::ostream& os, Vector& v) {
         if (v._size == 0) {
             os << "[]";
             return os;
@@ -151,8 +151,8 @@ public:
         arr[_size] = value;
         _size++;
     }
-    // pop returns the popped value
-    T& pop_back() {
+    // Return by value as reference could be dangling
+    T pop_back() {
         if (_size == 0) {
             throw std::invalid_argument("Cannot pop from empty vector");
         }
@@ -180,7 +180,6 @@ public:
         }
         return arr[_size - 1];
     }
-    // We don't implement iterators but return yes or no
     bool contains(const T& value) const {
         for (int i = 0; i < _size; i++) {
             if (arr[i] == value) {
