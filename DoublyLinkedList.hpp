@@ -1,6 +1,11 @@
 /*
-Doubly Linked List implementation
+Doubly Linked Stack implementation
 Features smart pointers and templates
+Thoughts: using weak_ptr is unnecessary and introduces
+additional complexities into the code
+It is enough to just use either:
+- unique_ptr for forward reference and dumb ptrs for backrefs, or:
+- use dumb ptrs and destructors
 */
 
 #include <iostream>
@@ -8,13 +13,13 @@ Features smart pointers and templates
 #include <cassert>
 #include <memory>
 
-// Forward declaration of List class for Node
+// Forward declaration of Stack class for Node
 template <typename T>
-class List;
+class Stack;
 
 template <typename T>
 class Node {
-    friend class List<T>;
+    friend class Stack<T>;
 private:
     T val;
     std::shared_ptr<Node<T>> next;
@@ -25,21 +30,21 @@ public:
 };
 
 template <typename T>
-class List {
+class Stack {
 private:
     std::shared_ptr<Node<T>> head;
     std::shared_ptr<Node<T>> tail;
-    int size;
+    int _size;
 public:
     // Idea: have sentinel values to make appends and deletes
     // Easier to implement
-    List(): head(std::make_shared<Node<T>>()), 
+    Stack(): head(std::make_shared<Node<T>>()), 
             tail(std::make_shared<Node<T>>()), 
-            size(0) {
+            _size(0) {
         head->next = tail;
         tail->prev = head;
     }
-    void append(T val) {
+    void push(T val) {
         auto prevTail = tail->prev.lock();
         if (prevTail) {
             auto newNode = std::make_shared<Node<T>>(val);
@@ -48,15 +53,15 @@ public:
 
             newNode->next = tail;
             newNode->prev = prevTail;
-            size++;
+            _size++;
         } else {
             throw std::runtime_error("Append failed from invalid weak_ptr lock");
         }
     }
     void pop() {
-        // Remove last element from the list
-        if (size == 0) {
-            throw std::runtime_error("Cannot pop back from empty list\n");
+        // Remove last element from the Stack
+        if (_size == 0) {
+            throw std::runtime_error("Cannot pop back from empty Stack");
         }
         // Must I use .lock()?
         std::shared_ptr<Node<T>> newLast = tail->prev.lock();
@@ -64,25 +69,35 @@ public:
             newLast = newLast->prev.lock();
         }
         if (newLast) {
-            auto x = tail->prev.lock();
-            if (x) {
-                newLast->next = x;
-                tail->prev = newLast;
-                size--;
-                return;
-            }
+            newLast->next = tail;
+            tail->prev = newLast;
+            _size--;
+            return;
         }
         throw std::runtime_error("Remove failed from invalid weak_ptr lock");
         // RAII: prev tail element automatically left out of scope.
     }
-    friend std::ostream& operator<<(std::ostream& os, List<T> list) {
-        if (list.size == 0) {
-            os << "Empty List";
+    T top() {
+        auto last = tail->prev.lock();
+        if (last) {
+            return last->val;
+        }
+        throw std::runtime_error("Weak ptr failed to lock");
+    }
+    bool empty() {
+        return (this->_size == 0);
+    }
+    int size() {
+        return this->_size;
+    }
+    friend std::ostream& operator<<(std::ostream& os, const Stack<T>& stk) {
+        if (stk._size == 0) {
+            os << "Empty Stack";
             return os;
         }
         os << "[";
-        std::shared_ptr<Node<T>> curr = list.head->next;
-        auto last = list.tail->prev.lock();
+        std::shared_ptr<Node<T>> curr = stk.head->next;
+        auto last = stk.tail->prev.lock();
         if (!last) {
             return os;
         }
