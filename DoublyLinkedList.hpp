@@ -17,11 +17,11 @@ class Node {
     friend class List<T>;
 private:
     T val;
-    std::shared_ptr<Node> next;
-    std::weak_ptr<Node> prev;
+    std::shared_ptr<Node<T>> next;
+    std::weak_ptr<Node<T>> prev;
 public:
     Node() = default;
-    Node(T value) : val(value), next(nullptr), prev(nullptr) {};
+    Node(T value) : val(value) {};
 };
 
 template <typename T>
@@ -33,17 +33,23 @@ private:
 public:
     // Idea: have sentinel values to make appends and deletes
     // Easier to implement
-    List(): head(Node<T>()), tail(Node<T>()), size(0) {
+    List(): head(std::make_shared<Node<T>>()), 
+            tail(std::make_shared<Node<T>>()), 
+            size(0) {
         head->next = tail;
         tail->prev = head;
     }
     void append(T val) {
-        Node<T> *prevTail = tail->prev;
-        prevTail->next = std::make_shared<Node<T>>(val);
-        Node<T> *newNode = prevTail->next;
-        newNode->next = tail;
-        newNode->prev = prevTail;
-        size++;
+        auto prevTail = tail->prev.lock();
+        if (prevTail) {
+            prevTail->next = std::make_shared<Node<T>>(val);
+            auto newNode = prevTail->next;
+            newNode->next = tail;
+            newNode->prev = prevTail;
+            size++;
+        } else {
+            throw std::runtime_error("Append failed from invalid weak_ptr lock");
+        }
     }
     void pop() {
         // Remove last element from the list
@@ -51,15 +57,22 @@ public:
             throw std::runtime_error("Cannot pop back from empty list\n");
         }
         // Must I use .lock()?
-        Node<T> *newLast = tail->prev->prev;
-        newLast->next = tail->prev;
-        tail->prev = newLast;
+        std::shared_ptr<Node<T>> newLast = tail->prev.lock();
+        if (newLast) {
+            newLast = newLast->prev.lock();
+        }
+        if (newLast) {
+            newLast->next = tail->prev;
+            tail->prev = newLast;
+        } else {
+            throw std::runtime_error("Remove failed from invalid weak_ptr lock");
+        }
         // RAII: prev tail element automatically left out of scope.
     }
     friend std::ostream& operator<<(std::ostream& os, List<T> list) {
         os << "[";
-        Node<T> *curr = list.head->next;
-        while (curr) {
+        std::shared_ptr<Node<T>> curr = list.head->next;
+        while (curr != list.tail) {
             os << curr->val << ", ";
             curr = curr->next;
         }
