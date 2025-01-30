@@ -42,8 +42,10 @@ public:
     void append(T val) {
         auto prevTail = tail->prev.lock();
         if (prevTail) {
-            prevTail->next = std::make_shared<Node<T>>(val);
-            auto newNode = prevTail->next;
+            auto newNode = std::make_shared<Node<T>>(val);
+            prevTail->next = newNode;
+            tail->prev = newNode;
+
             newNode->next = tail;
             newNode->prev = prevTail;
             size++;
@@ -62,21 +64,33 @@ public:
             newLast = newLast->prev.lock();
         }
         if (newLast) {
-            newLast->next = tail->prev;
-            tail->prev = newLast;
-        } else {
-            throw std::runtime_error("Remove failed from invalid weak_ptr lock");
+            auto x = tail->prev.lock();
+            if (x) {
+                newLast->next = x;
+                tail->prev = newLast;
+                size--;
+                return;
+            }
         }
+        throw std::runtime_error("Remove failed from invalid weak_ptr lock");
         // RAII: prev tail element automatically left out of scope.
     }
     friend std::ostream& operator<<(std::ostream& os, List<T> list) {
+        if (list.size == 0) {
+            os << "Empty List";
+            return os;
+        }
         os << "[";
         std::shared_ptr<Node<T>> curr = list.head->next;
-        while (curr != list.tail) {
+        auto last = list.tail->prev.lock();
+        if (!last) {
+            return os;
+        }
+        while (curr != last) {
             os << curr->val << ", ";
             curr = curr->next;
         }
-        os << "]";
+        os << curr->val << "]";
         return os;
     }
 };
