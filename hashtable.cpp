@@ -5,9 +5,6 @@ Properties:
 - needs add method: needs to overload operator[]
 - needs to value-initialize the value if operator[] looked at
 - .contains()
-- how do deal with collisions?
--- I think we can try separate chaining
--- alternatively, open addressing requires resizing ability
 
 How to resize a hashtable?
 allocate a space twice as large
@@ -34,29 +31,34 @@ private:
     std::vector<std::pair<Key, std::optional<Value>>> table;
     // what if there is no std::has<Key>?
     std::hash<Key> hasher;
-    size_t secondary(size_t value) {
-        // unsigned integers wrap naturally instead of throwing overflow error
-        return (value * 17 + 31) % capacity;
-    }
     // resizing
     void resize(int newCapacity) {
         if (newCapacity < START_SIZE) {
-            throw std::invalid_argument("new size is too small");
+            throw std::invalid_argument("New size is too small");
         }
         auto new_table = std::move(table);
         table.clear();
         table.resize(newCapacity);
         for (auto [k, v] : new_table) {
-            insert(k, v.value());
+            if (v.has_value()) {
+                insert(k, v.value());
+            }
         }
     }
-public:
-    Map() : size(0), capacity(16) {}
-    void insert(const Key& k, const Value& v) {
+    // Gets the corresponding slot that a key is located in
+    size_t getSlot(const Key& k) {
         size_t hash = hasher(k) % capacity;
-        while (table[hash].second) {
-            hash = secondary(hash);
+        // Problem: we cannot know when to stop searching
+        // Because the table might be null.
+        while (table[hash].first != k && table[hash].first) {
+            hash = (hash + 1) % capacity;
         }
+        return hash;
+    }
+public:
+    Map() : size(0), capacity(16), table(16) {}
+    void insert(const Key& k, const Value& v) {
+        size_t hash = getSlot(k);
         // If I am inserting, can I use const lvalue references for k and v?
         table[hash] = {k, v};
         size++;
@@ -66,10 +68,7 @@ public:
         }
     }
     void erase(const Key& k) {
-        size_t hash = hasher(k) % capacity;
-        while (table[hash].first != k && table[hash].second) {
-            hash = secondary(hash);
-        }
+        size_t hash = getSlot(k);
         if (!table[hash].second.has_value()) {
             throw std::invalid_argument("Key not found");
         }
@@ -79,13 +78,7 @@ public:
     }
     // TODO: how to increment size if it's an assignment?
     Value& operator[](const Key& k) {
-        size_t hash = hasher(k) % capacity;
-        while (table[hash].second && table[hash].first != k) {
-            hash = secondary(hash);
-        }
-        if (!table[hash].second) {
-            throw std::invalid_argument("Key not found");
-        }
+        size_t hash = getSlot(k);
         return table[hash].second.value();
     }
 };
